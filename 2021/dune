@@ -1,0 +1,43 @@
+(executable
+ (name J1)
+ (modules J1))
+
+(executable
+ (name J2)
+ (modules J2))
+
+(executable
+ (name J2bis)
+ (modules J2bis))
+
+(executable
+ (name J3)
+ (modules J3))
+
+(executable
+ (name J3bis)
+ (modules J3bis))
+
+(executable
+ (name J4)
+ (modules J4))
+
+(executable
+ (name J5)
+ (modules J5))
+
+(executable
+ (name J6)
+ (modules J6))
+
+(executable
+ (name J7)
+ (modules J7))
+
+(executable
+ (name J8)
+ (modules J8))
+
+(executable
+ (name J9)
+ (modules J9))
