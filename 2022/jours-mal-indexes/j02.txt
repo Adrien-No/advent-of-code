@@ -1,6 +1,6 @@
 Printexc.record_backtrace true
 
-let file = open_in "j2.txt"
+let file = open_in "j02.txt"
 
 let rec read f tot =
   try
