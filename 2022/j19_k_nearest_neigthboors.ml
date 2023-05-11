@@ -1,35 +1,47 @@
-(* TODO : *)
-(* - tester la fonction comparePath (vérifier la cohérence des résultats) *)
-(* - on arrive pas à craft des Geodes : *)
-(*      - verifier que pour k suffisamment grand on obtient une solution optimale *)
-(*      - trouver un moyen d'avoir un petit k (amelioration de la formule / (pourcentage de completion pour la construction d'un robot), ) *)
+(* One game-lap is one minute, each minute we receive one resource per robot of this resource, *)
+(* and each minute we can also do nothing or craft one robot of a resource *)
 
-Printexc.record_backtrace true
+(* The differents resources are : *)
+type resource = Ore | Clay | Obsi | Geode
 
+(* So the different action/choices/choix that can be made are : *)
+type choix = Construire of resource | Economiser
+
+(* We wants to explore the tree of possibilites given by choosing at each turn (or minute) a action to do. *)
+(* Because 5^24 is a lot, we wants to "cut" some branchs of the tree, to reduce possibilites and find-out faster an optimal-one.*)
+(* For this we'll use bit of logical (function "max_n_plus_un") *)
+(* and also realise a k-nearest-neigthboors algorithms *)
+
+(* We'll call "inventory" (or inv) resource available at a given time. *)
+(* "base" will be all the robots that we have at a given time.*)
+
+(* representation of a blueprint (our entry) *)
 type blueprint = {
   core : int; (* cost of ore *)
   cclay : int;
   cobsi : int*int; (* (ore, clay) *)
   cgeode : int*int; (* (ore, obsi) *)
 }
+
+ (* an inventory (inv) or a base *)
 type four_uplet = int * int * int * int
-type ressources = Ore | Clay | Obsi | Geode
-type choix = Construire of ressources | Economiser
 
-let minutes_max = 24
-(* k choosed for k-nearest-neigthboors *)
-let k = 10_000
+(* constants choosed for k-nearest-neigthboors *)
+let k1 = 620 (* that works for me, 1,3 s for the first entry with a laptop *)
+let k2 = 3150 (* works also, in 1,2 s *)
+
 (* our epsilons *)
-let eps_rgeode = 200
-let eps_ngeode = 40
+let eps_rgeode = 100
+let eps_ngeode = 10
 
-let eps_robsi = 30 (*40*)
-let eps_nobsi = 5
-let eps_rclay = 0 (*10*)
+let eps_robsi = 1 (*30*)
+let eps_nobsi = 1  (*5*)
+let eps_rclay = 0
 let eps_nclay = 0
-let eps_rore =  0(*10*)
+let eps_rore =  0
 let eps_nore = 0
 
+(* Compare two paths in the tree, according to epsilons. Will be used for sorting. *)
 let comparePath = (fun (_,(nore1,nclay1,nobsi1,ngeode1),(rore1,rclay1,robsi1,rgeode1)) (_,(nore2,nclay2,nobsi2,ngeode2),(rore2,rclay2,robsi2,rgeode2)) ->
     eps_nore  * (compare nore1 nore2)   +
     eps_rore  * (compare rore1 rore2)   +
@@ -41,7 +53,9 @@ let comparePath = (fun (_,(nore1,nclay1,nobsi1,ngeode1),(rore1,rclay1,robsi1,rge
     eps_rgeode * (compare rgeode1 rgeode2)
   )
 
+(* ================================================================ misc ================================================================ *)
 let get_k_firsts l k =
+  (* returns the k-first elements of the list l *)
   let rec aux l acc k =
     match l with
       [] -> acc
@@ -50,6 +64,7 @@ let get_k_firsts l k =
   aux l [] k
 
 let map_rec_tale f l =
+  (* same as the map of stdlib but tail-recursive *)
   let rec aux acc = function
       [] -> acc
     | t::q -> let r = f t in aux (r::acc) q
@@ -57,12 +72,24 @@ let map_rec_tale f l =
   aux [] l
 
 let concat_rec_tale l =
+  (* same as concat of stdlib but tail-recursive *)
   let rec aux acc = function
       [] -> acc
     | t::q -> aux (t @ acc) q
   in
   aux [] l
-(* ================================================================ entrée ================================================================ *)
+
+let can_craft (a,b,c,d) (bp:blueprint) (r:resource) : bool =
+  (* returns true if and only if the resource r is craftable with the inventory (a,b,c,d) *)
+  match r with
+    Ore ->  a >= bp.core
+  | Clay -> a >= bp.cclay
+  | Obsi -> a >= fst bp.cobsi && b >= snd bp.cobsi
+  | Geode -> a >= fst bp.cgeode && c >= snd bp.cgeode
+
+(* ====================================================================================================================================== *)
+
+(* =============================================================== entry ================================================================ *)
 let data =
   let f = Scanf.Scanning.from_channel (open_in "j19.txt") in
   let rec read l =
@@ -73,169 +100,91 @@ let data =
     with End_of_file -> l
   in
   read []
-(* ======================================================================================================================================== *)
+(* ====================================================================================================================================== *)
 
-(* ============================================================== affichage =============================================================== *)
-let print_inv (a,b,c,d) =
-  Printf.printf "(n_ore = %i, n_clay = %i, n_obsi = %i, n_geode = %i)\n" a b c d
-
-let print_base (a,b,c,d) =
-  Printf.printf "(r_ore = %i, r_clay = %i, r_obsi = %i, r_geode = %i)\n" a b c d
-
-let print_max_found t =
-  Printf.printf "[|";
-  Array.iteri (fun i x -> Printf.printf "%i" x; if not (i = Array.length t) then Printf.printf " ;"  ) t;
-  Printf.printf "|]\n"
-
-let string_of_choix c =
-  match c with
-    Economiser -> "Economiser"
-  | Construire r -> "Construire " ^
-                    match r with
-                      Ore -> "Ore"
-                    | Clay -> "Clay"
-                    | Obsi -> "Obsi"
-                    | Geode -> "Geode"
-
-let print_choix_fouruplet_fouruplet_list (l:(choix*four_uplet*four_uplet) list) =
-  Printf.printf "[";
-  List.iteri (fun i (choix,(a,b,c,d),(e,f,g,h)) -> Printf.printf "(%s, (%i, %i, %i, %i), (%i, %i, %i, %i))" (string_of_choix choix) a b c d e f g h; if not (i = List.length l) then Printf.printf " ;\n") l;
-  Printf.printf "]\n"
-(* ======================================================================================================================================== *)
-
-let can_craft (a,b,c,d) (bp:blueprint) (r:ressources) : bool =
-  (* Printf.printf "On a :"; *)
-  (* print_inv (a,b,c,d); *)
-  (* print_newline(); *)
-  match r with
-    Ore ->  a >= bp.core
-  | Clay -> a >= bp.cclay
-  | Obsi -> a >= fst bp.cobsi && b >= snd bp.cobsi
-  | Geode -> a >= fst bp.cgeode && c >= snd bp.cgeode
-
+(* ============================================================ main function =========================================================== *)
 exception Trouve of bool array
-let max_geode (bp:blueprint) : int =
+let max_geode (bp:blueprint) (minutes_max:int) k : int =
+  (* returns the maximum geode available after minutes_max mins, for the blueprint bp *)
 
-  let max_ore = List.fold_left max 0 [(*bp.core;*)bp.cclay;fst bp.cobsi;fst bp.cgeode] in
+  (* Since we can't create more than one robot at time, it's useless to harvest more resources each turns that we could use on this turn. *)
+  let max_ore = List.fold_left max 0 [bp.cclay;fst bp.cobsi;fst bp.cgeode] in
   let max_clay = snd bp.cobsi in
   let max_obsi = snd bp.cgeode in
-  let max_found = [|0;0;0;0;0;0;0;0|] in (* n_ore, n_ *)
-  let update_max_found (n_ore, n_clay, n_obsi, n_geode) (r_ore, r_clay, r_obsi, r_geode) =
-    let n = [|n_ore; n_clay; n_obsi; n_geode; r_ore; r_clay; r_obsi; r_geode|] in
-    Array.blit (Array.map2 max n max_found) 0 max_found 0 (Array.length max_found)
-    (* if max_found <> n then print_max_found max_found *)
-  in
 
-  (* pour suivre la première fois que la borne k est atteinte (ie on prend pas tout les candidats) *)
-  let chip = ref true in
-  (* ================================================================ "recurence" ================================================================ *)
+  (* ================ "recurrence" ================ *)
   let max_n_plus_un (n_ore, n_clay, n_obsi, n_geode) (r_ore, r_clay, r_obsi, r_geode) (minutes) (choix:choix): (choix*four_uplet*four_uplet) list =
     let inv,base =
-      (* on compte la récolte ainsi que le choix pris pour les nouvelles valeurs de inv et base *)
+      (* we updates inv and base according to the harvest and the choice we made (eventually spend resources to build a robot) *)
       match choix with
-        Economiser -> (*Printf.printf "Economiser\n";*)(n_ore+r_ore,n_clay+r_clay,n_obsi+r_obsi,n_geode+r_geode), (r_ore,r_clay,r_obsi,r_geode)
+        Economiser -> (n_ore+r_ore,n_clay+r_clay,n_obsi+r_obsi,n_geode+r_geode), (r_ore,r_clay,r_obsi,r_geode)
       | Construire ressource ->
         match ressource with
-          Ore -> (*Printf.printf "Construire Ore\n";*)(n_ore+r_ore-bp.core            ,n_clay+r_clay             ,n_obsi+r_obsi                ,n_geode+r_geode), (r_ore+1,r_clay,r_obsi,r_geode)
-        | Clay -> (* Printf.printf "Construire Clay\n"; *)(n_ore+r_ore-bp.cclay         ,n_clay+r_clay             ,n_obsi+r_obsi                ,n_geode+r_geode), (r_ore,r_clay+1,r_obsi,r_geode)
-        | Obsi -> (* Printf.printf "Construire Obsi\n"; *)(n_ore+r_ore-fst bp.cobsi     ,n_clay+r_clay-snd bp.cobsi,n_obsi+r_obsi                ,n_geode+r_geode), (r_ore,r_clay,r_obsi+1,r_geode)
-        | Geode -> (* Printf.printf "Construire Geode\n"; *)(n_ore+r_ore- fst bp.cgeode ,n_clay+r_clay             ,n_obsi+r_obsi - snd bp.cgeode,n_geode+r_geode), (r_ore,r_clay,r_obsi,r_geode+1)
+          Ore -> (n_ore+r_ore-bp.core            ,n_clay+r_clay             ,n_obsi+r_obsi                ,n_geode+r_geode), (r_ore+1,r_clay,r_obsi,r_geode)
+        | Clay -> (n_ore+r_ore-bp.cclay         ,n_clay+r_clay             ,n_obsi+r_obsi                ,n_geode+r_geode), (r_ore,r_clay+1,r_obsi,r_geode)
+        | Obsi -> (n_ore+r_ore-fst bp.cobsi     ,n_clay+r_clay-snd bp.cobsi,n_obsi+r_obsi                ,n_geode+r_geode), (r_ore,r_clay,r_obsi+1,r_geode)
+        | Geode -> (n_ore+r_ore- fst bp.cgeode ,n_clay+r_clay             ,n_obsi+r_obsi - snd bp.cgeode,n_geode+r_geode), (r_ore,r_clay,r_obsi,r_geode+1)
     in
     let (n_ore, n_clay, n_obsi, n_geode), (r_ore, r_clay, r_obsi, r_geode) = inv, base in
-    (* Printf.printf "minute : %i\n" minutes; print_inv inv; print_base base; *)
-    (* if not (Array.exists2 (>=) max_found [|n_ore; n_clay; n_obsi; n_geode; r_ore; r_clay; r_obsi; r_geode|]) then *)
-    (*   [] *)
-    (* else *)
-      let coups = [|true;true;true;true;true|] in (* les cases correspondent à Economiser, Construire (Ore, Clay, Obsi et Geode) *)
-      try
-        if can_craft inv bp Ore  |> not || r_ore >= max_ore then
-          coups.(1) <- false;
-        if can_craft inv bp Clay |> not || r_clay >= max_clay then
-          coups.(2) <- false;
-        if not (can_craft inv bp Obsi)  || r_obsi >= max_obsi then
-          coups.(3) <- false;
-        if not (can_craft inv bp Geode) then
-          coups.(4) <- false;
-        (* on fait des Geodes dès qu'on peut *)
-        if can_craft inv bp Geode then
-          begin
-            (* Printf.printf " \n\nON PEUT CRAFT GEODE\n\n"; *)
-            for i = 0 to 3 do coups.(0) <- false done;
-            raise (Trouve coups);
-          end
-          (* ================= méthode FOMR (Full Ore then Max Resource) ============== *)
-        (* else if r_ore < max_ore then *)
-        (*   begin *)
-        (*     if can_craft inv bp Ore then *)
-        (*       raise (Trouve [|false;true;false;false;false|]) *)
-        (*     else *)
-        (*       raise (Trouve [|true;false;false;false;false|]) *)
-        (*   end *)
 
-        (* else if r_obsi < max_obsi && can_craft inv bp Obsi then *)
-        (*       raise (Trouve [|false;false;false;true;false|]) *)
-        (* else if r_clay < max_clay && can_craft inv bp Clay then *)
-        (*       raise (Trouve [|false;true;false;false;false|]) *)
+    (* We starts with all 5 choices / possibles "coups", and then filter them (put the coresponding index of array at false : 0 for Economiser, 1 for Construire Ore ...) *)
+    let coups = [|true;true;true;true;true|] in
+    try
+      (* uncraftable / too much *)
+      if not (can_craft inv bp Ore) || r_ore >= max_ore then
+        coups.(1) <- false;
+      if not (can_craft inv bp Clay) || r_clay >= max_clay then
+        coups.(2) <- false;
+      if not (can_craft inv bp Obsi)  || r_obsi >= max_obsi then
+        coups.(3) <- false;
+      if not (can_craft inv bp Geode) then
+        coups.(4) <- false;
 
-  (* =============================== trop greedy ============================== *)
-  (* build all robot Ore first *)
-else (* if r_ore < max_ore then *)
-  (*     if can_craft inv bp Ore then *)
-  (*       raise (Trouve [|false;true;false;false;false|]) *)
-  (*     else *)
-  (*     if can_craft inv bp Clay then *)
-  (*       raise (Trouve [|false;true;true;false;false|]) *)
-  (*     else *)
-  (*       raise (Trouve [|true;false;false;false;false|]) *)
+      (* we made geode as we can (pretty greedy)*)
+      if can_craft inv bp Geode then
+        begin
+          for i = 0 to 3 do coups.(0) <- false done;
+          raise (Trouve coups);
+        end
+      else
+        raise (Trouve coups)
 
-  (* else if can_craft inv bp Obsi && r_obsi < max_obsi then *)
-  (*   raise (Trouve [|false;false;false;true;false|]) *)
-  (* else if can_craft inv bp Clay && r_clay < max_clay then *)
-  (*   raise (Trouve [|false;false;true;false;false|]) *)
-  (* else *)
-  (* experimental *)
-  (* if (can_craft inv bp Ore || n_ore = max_ore) && (can_craft inv bp Clay || n_clay = max_clay) && (can_craft inv bp Obsi || n_obsi = max_obsi) then *)
-  (*   coups.(0) <- false; *)
-  raise (Trouve coups)
+     (* filter *)
+    with Trouve coups -> (
+        [(Economiser,inv,base) ; (Construire Ore,inv,base) ; (Construire Clay,inv,base) ; (Construire Obsi,inv,base) ; (Construire Geode,inv,base)]
+        |> List.filteri (fun i _ -> coups.(i))
+      )
+  in
+  (* ============================================== *)
 
-(* ============================================================================ *)
-with Trouve coups -> (
-  update_max_found inv base;
-  [(Economiser,inv,base) ; (Construire Ore,inv,base) ; (Construire Clay,inv,base) ; (Construire Obsi,inv,base) ; (Construire Geode,inv,base)]
-  |> List.filteri (fun i _ -> coups.(i))
-  (* |> (fun l -> let l2 = List.filteri (fun i _ -> coups.(i)) l in Printf.printf "len_avant_filtre :%i | apres :%i\n" (List.length l) (List.length l2); l2 ) *)
-)
-in
-(* =========================================================================================================================================== *)
+  let knn = ref [(Economiser, (0,0,0,0), (1,0,0,0))] in
+  for minutes = 1 to minutes_max do
+    (* we build then edit the list of following possibilities *)
+    let suivants = concat_rec_tale (map_rec_tale (fun (move,inv,base) -> max_n_plus_un inv base minutes move) !knn) in
+    let suiv_sorted = List.sort comparePath suivants |> List.rev in
 
-let knn = ref [(Economiser, (0,0,0,0), (1,0,0,0))] in
-for minutes = 1 to minutes_max do
-  (*print_choix_fouruplet_fouruplet_list !knn;*)
-  if minutes = 24 then (Printf.printf "< Minute 24 > :"; print_max_found max_found);
-  let suivants = concat_rec_tale (map_rec_tale (fun (move,inv,base) -> max_n_plus_un inv base minutes move) !knn) in
-  let suiv_sorted = List.sort comparePath suivants |> List.rev in
+    let k_firsts = get_k_firsts suiv_sorted k in
+    knn := k_firsts;
+  done;
+  List.fold_left (fun b (_,(_,_,_,ngeode),_) -> max ngeode b) 0 !knn
 
-  if !chip && List.length suiv_sorted >= k then
-    (Printf.printf "< Minute %i > Borne des k atteinte !\n" minutes; print_max_found max_found ; chip := false);
-
-  let k_firsts = get_k_firsts suiv_sorted k in
-  knn := k_firsts;
-done;
-List.fold_left (fun b (_,(_,_,_,ngeode),_) -> max ngeode b) 0 !knn
+(* ====================================================================================================================================== *)
 
 let compute_output (l : (int*blueprint) list) : int =
+  (* part 1 *)
+  let minutes_max = 24 in
   l
-  |> map_rec_tale (fun (id,bp) -> let m = max_geode bp in Printf.printf "id : %i | max : %i\n\n\n" id m ; id * m)
+  |> map_rec_tale (fun (id,bp) -> id, max_geode bp minutes_max k1)
   |> List.fold_left (+) 0
 
+let compute_output2 l : int =
+  (* part 2 *)
+  let minutes_max = 32 in
+  let three_firsts = get_k_firsts (List.rev l) 2 in
+  three_firsts
+  |> map_rec_tale (fun (id,bp) -> let m = max_geode bp minutes_max k2 in Printf.printf "id : %i | max : %i\n" id m ; m)
+  |> List.fold_left ( * ) 1
+
 let _ =
-  Printf.printf "k = %i\n" k;
-  Printf.printf "Partie 1 : %i\n" (compute_output data)
-
-(* On commence à prendre qu'une partie des suivants à partir de la minute ~10. *)
-(* Or il n'est possible d'avoir des géodes que bien après *)
-(* => Il faut garder toutes les solutions jusqu'à ce qu'on commence à avoir des geodes, *)
-(* ou bien mettre des poids sur les obsidiennes aussi *)
-
-(* solution pour mon entrée : *)
-(* 1958, trouvé avec k = 10_000 en 21,8s *)
+  Printf.printf "Partie 1 : %i\n" (compute_output data);
+  Printf.printf "Partie 2 : %i\n" (compute_output2 data);
