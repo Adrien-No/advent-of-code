@@ -7,10 +7,10 @@ type resource = Ore | Clay | Obsi | Geode
 (* So the different action/choices/choix that can be made are : *)
 type choix = Construire of resource | Economiser
 
-(* We wants to explore the tree of possibilites given by choosing at each turn (or minute) a action to do. *)
-(* Because 5^24 is a lot, we wants to "cut" some branchs of the tree, to reduce possibilites and find-out faster an optimal-one.*)
-(* For this we'll use bit of logical (function "max_n_plus_un") *)
-(* and also realise a k-nearest-neigthboors algorithms *)
+(* We want to explore the tree of possibilities given by choosing at each turn (or minute) an action to do. *)
+(* Because 5^24 is a lot, we want to "cut" some branches of the tree, to reduce possibilities and find-out faster an optimal-one.*)
+(* For this we'll use a bit of logical (function "max_n_plus_un") *)
+(* And also realise a k-nearest-neigthboors algorithms *)
 
 (* We'll call "inventory" (or inv) resource available at a given time. *)
 (* "base" will be all the robots that we have at a given time.*)
@@ -26,7 +26,7 @@ type blueprint = {
  (* an inventory (inv) or a base *)
 type four_uplet = int * int * int * int
 
-(* constants choosed for k-nearest-neigthboors *)
+(* constants chose for k-nearest-neigthboors *)
 let k1 = 620 (* that works for me, 1,3 s for the first entry with a laptop *)
 let k2 = 3150 (* works also, in 1,2 s *)
 
@@ -80,7 +80,7 @@ let concat_rec_tale l =
   aux [] l
 
 let can_craft (a,b,c,d) (bp:blueprint) (r:resource) : bool =
-  (* returns true if and only if the resource r is craftable with the inventory (a,b,c,d) *)
+  (* returns true if and only if the resource r can be crafted with the inventory (a,b,c,d) *)
   match r with
     Ore ->  a >= bp.core
   | Clay -> a >= bp.cclay
@@ -107,7 +107,7 @@ exception Trouve of bool array
 let max_geode (bp:blueprint) (minutes_max:int) k : int =
   (* returns the maximum geode available after minutes_max mins, for the blueprint bp *)
 
-  (* Since we can't create more than one robot at time, it's useless to harvest more resources each turns that we could use on this turn. *)
+  (* Since we can't create more than one robot at a time, it's useless to harvest more resources each turns that we could use on this turn. *)
   let max_ore = List.fold_left max 0 [bp.cclay;fst bp.cobsi;fst bp.cgeode] in
   let max_clay = snd bp.cobsi in
   let max_obsi = snd bp.cgeode in
@@ -115,7 +115,7 @@ let max_geode (bp:blueprint) (minutes_max:int) k : int =
   (* ================ "recurrence" ================ *)
   let max_n_plus_un (n_ore, n_clay, n_obsi, n_geode) (r_ore, r_clay, r_obsi, r_geode) (minutes) (choix:choix): (choix*four_uplet*four_uplet) list =
     let inv,base =
-      (* we updates inv and base according to the harvest and the choice we made (eventually spend resources to build a robot) *)
+      (* we update inv and base according to the harvest and the choice we made (eventually spend the resources to build a robot) *)
       match choix with
         Economiser -> (n_ore+r_ore,n_clay+r_clay,n_obsi+r_obsi,n_geode+r_geode), (r_ore,r_clay,r_obsi,r_geode)
       | Construire ressource ->
@@ -127,7 +127,7 @@ let max_geode (bp:blueprint) (minutes_max:int) k : int =
     in
     let (n_ore, n_clay, n_obsi, n_geode), (r_ore, r_clay, r_obsi, r_geode) = inv, base in
 
-    (* We starts with all 5 choices / possibles "coups", and then filter them (put the coresponding index of array at false : 0 for Economiser, 1 for Construire Ore ...) *)
+    (* We start with all 5 choices / possibles "coups", and then filter them (put the corresponding index of the array at false : 0 for Economiser, 1 for Construire Ore ...) *)
     let coups = [|true;true;true;true;true|] in
     try
       (* uncraftable / too much *)
