@@ -1,2 +1,0 @@
-Valeur 1 : 5
-Valeur 2 : 6
