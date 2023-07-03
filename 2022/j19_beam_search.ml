@@ -157,16 +157,16 @@ let max_geode (bp:blueprint) (minutes_max:int) k : int =
   in
   (* ============================================== *)
 
-  let knn = ref [(Economiser, (0,0,0,0), (1,0,0,0))] in
+  let beam = ref [(Economiser, (0,0,0,0), (1,0,0,0))] in
   for minutes = 1 to minutes_max do
     (* we build then edit the list of following possibilities *)
-    let suivants = concat_rec_tale (map_rec_tale (fun (move,inv,base) -> max_n_plus_un inv base minutes move) !knn) in
+    let suivants = concat_rec_tale (map_rec_tale (fun (move,inv,base) -> max_n_plus_un inv base minutes move) !beam) in
     let suiv_sorted = List.sort comparePath suivants |> List.rev in
 
     let k_firsts = get_k_firsts suiv_sorted k in
-    knn := k_firsts;
+    beam := k_firsts;
   done;
-  List.fold_left (fun b (_,(_,_,_,ngeode),_) -> max ngeode b) 0 !knn
+  List.fold_left (fun b (_,(_,_,_,ngeode),_) -> max ngeode b) 0 !beam
 
 (* ====================================================================================================================================== *)
 
@@ -174,7 +174,7 @@ let compute_output (l : (int*blueprint) list) : int =
   (* part 1 *)
   let minutes_max = 24 in
   l
-  |> map_rec_tale (fun (id,bp) -> id, max_geode bp minutes_max k1)
+  |> map_rec_tale (fun (id,bp) -> id * (max_geode bp minutes_max k1))
   |> List.fold_left (+) 0
 
 let compute_output2 l : int =
@@ -182,7 +182,7 @@ let compute_output2 l : int =
   let minutes_max = 32 in
   let three_firsts = get_k_firsts (List.rev l) 2 in
   three_firsts
-  |> map_rec_tale (fun (id,bp) -> let m = max_geode bp minutes_max k2 in Printf.printf "id : %i | max : %i\n" id m ; m)
+  |> map_rec_tale (fun (id,bp) -> let m = max_geode bp minutes_max k2 in (* Printf.printf "id : %i | max : %i\n" id m ; *) m)
   |> List.fold_left ( * ) 1
 
 let _ =
