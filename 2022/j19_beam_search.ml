@@ -10,7 +10,7 @@ type choix = Construire of resource | Economiser
 (* We want to explore the tree of possibilities given by choosing at each turn (or minute) an action to do. *)
 (* Because 5^24 is a lot, we want to "cut" some branches of the tree, to reduce possibilities and find-out faster an optimal-one.*)
 (* For this we'll use a bit of logical (function "max_n_plus_un") *)
-(* And also realise a k-nearest-neigthboors algorithms *)
+(* And also realise a implement a beam-search algorithms *)
 
 (* We'll call "inventory" (or inv) resource available at a given time. *)
 (* "base" will be all the robots that we have at a given time.*)
@@ -26,7 +26,7 @@ type blueprint = {
  (* an inventory (inv) or a base *)
 type four_uplet = int * int * int * int
 
-(* constants chose for k-nearest-neigthboors *)
+(* constants chose for the beam search *)
 let k1 = 620 (* that works for me, 1,3 s for the first entry with a laptop *)
 let k2 = 3150 (* works also, in 1,2 s *)
 
