@@ -187,4 +187,4 @@ let compute_output2 l : int =
 
 let _ =
   Printf.printf "Partie 1 : %i\n" (compute_output data);
-  Printf.printf "Partie 2 : %i\n" (compute_output2 data);
+  Printf.printf "Partie 2 : %i\n" (compute_output2 data)
