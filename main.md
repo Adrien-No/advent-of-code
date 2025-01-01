@@ -1,0 +1,3 @@
+[Advent of Code](https://adventofcode.com) is an annual programming event that takes place in December. Every morning (at 6:00 AM UTC+2) until December 25th, a new original problem, split into two parts, is published. The event serves as an opportunity to practice programming skills or compete against others by solving the problems as quickly as possible.
+
+I publish my solutions here. One particularly interesting problem I worked on is [Day 19 of 2022](https://adventofcode.com/2022/day/19). It can be solved using a fairly exhaustive yet clever search approach, such as [beam search](https://github.com/Adrien-No/advent-of-code/blob/main/2022/j19_beam_search.ml).
